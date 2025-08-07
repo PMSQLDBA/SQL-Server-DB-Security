@@ -1,0 +1,46 @@
+Owner: Andrey SamykinAndrey Samykin
+Source: LinkedIn
+https://www.linkedin.com/posts/asamykin_mssql-mssqldba-activity-7358922197341466626-SF1K?utm_source=share&utm_medium=member_desktop&rcm=ACoAACKCDlIBwCyHwl-zdzyASa1BIP491KNZCLE
+
+"User was Added/Dropped or Got/Lost DB Role" – But Who and When Did That?
+
+Handy script that helps identify Who granted a user access to a database, When it happened, and which database roles were assigned.
+This script also shows who removed a user or modified their roles - useful for troubleshooting access issues or performing security audits.
+
+It leverages the default trace and the sys.traces catalog view.
+
+Interestingly, both user creation/deletion and role grant/revoke actions are tracked using the same event types in the default trace:
+'Audit Add DB User Event' - triggered for both creating and dropping a database user.
+'Audit Add Member to DB Role Event' - triggered for both granting and revoking a database role.
+This can be counterintuitive, so it's important to examine the EventSubClass and TextData columns in the output to distinguish the specific action (e.g., ADD vs DROP).
+
+Notes:
+Accessing sys.traces is itself logged in the default trace. This might trigger alerts in your organization's security monitoring tools (if such alerts are configured).
+The default trace consists of only 5 (five) files of 20MB each, and older data is overwritten over time. If you need to retain this information for long-term analysis, consider saving it to a separate table using a scheduled job.
+
+Caveats:
+This script may fail in the following scenarios:
+- If the default trace file name contains more than one underscore (_) character.
+- If any of the trace files is corrupted or inaccessible.
+
+Script:
+----------------------------------
+SELECT 
+ ft.StartTime
+ ,te.name [Event]
+ ,ft.EventSubClass
+ ,ft.DatabaseName
+ ,ft.TargetUserName
+ ,ft.RoleName
+ ,ft.TextData
+ ,ft.SPID
+ ,ft.LoginName
+ ,ft.ApplicationName
+ ,ft.Hostname
+FROM sys.traces st
+CROSS APPLY::fn_trace_gettable(left(st.path, len(st.path) - charindex('_', reverse(st.path))) + right(st.path, 4), st.max_files) ft
+INNER JOIN sys.trace_events te ON ft.EventClass = te.trace_event_id
+WHERE te.name in (N'Audit Add DB User Event',N'Audit Add Member to DB Role Event')
+ AND st.is_default = 1
+ AND st.STATUS = 1
+ORDER BY ft.StartTime DESC;

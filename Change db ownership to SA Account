@@ -1,0 +1,361 @@
+TSQL Stored Proc Scripts to verify and change db ownership to SA Account and audit this into an audit table:
+
+User Query: 
+Best way to manage database owners for multiple databases running across different SQL Server instances in production?
+By default, the user account (for example, a DBA domain account) used to create a database becomes the database owner. 
+However, issues may arise if that user leaves the company or if the domain account is removed from Active Directory (AD).
+How do you manage this in your production environment?
+==========================================================================================================================
+Below is a production-oriented pattern for Microsoft SQL Server that does all of the following:
+
+audits current ownership
+detects non-compliant databases
+changes ownership to sa
+logs every action
+supports dry-run mode
+works across all user databases on an instance
+=========================================================================================================
+This is substantially better than ad hoc scripts because it gives you:
+=========================================================================================================
+repeatability
+evidence for audit/compliance
+rollback visibility
+centralized operational history
+=========================================================================================================
+1. DBA Utility Database
+=========================================================================================================
+Do not place this in application databases.
+
+Create a dedicated DBA/admin database.
+
+USE master;
+GO
+
+IF DB_ID('DBAUtility') IS NULL
+BEGIN
+    CREATE DATABASE DBAUtility;
+END
+GO
+=========================================================================================================
+2. Audit Table
+=========================================================================================================
+This captures:
+
+previous owner
+new owner
+execution result
+timestamp
+operator
+dry-run vs actual execution
+=========================================================================================================
+USE DBAUtility;
+GO
+
+IF OBJECT_ID('dbo.DatabaseOwnerAudit', 'U') IS NOT NULL
+    DROP TABLE dbo.DatabaseOwnerAudit;
+GO
+CREATE TABLE dbo.DatabaseOwnerAudit
+(
+    AuditID                 BIGINT IDENTITY(1,1) PRIMARY KEY,
+    ServerName              SYSNAME         NOT NULL DEFAULT @@SERVERNAME,
+    DatabaseName            SYSNAME         NOT NULL,
+    PreviousOwner           SYSNAME         NULL,
+    NewOwner                SYSNAME         NULL,
+    ActionTaken             VARCHAR(50)     NOT NULL,
+    ExecutionStatus         VARCHAR(20)     NOT NULL,
+    ExecutionMessage        NVARCHAR(MAX)   NULL,
+    ExecutedBy              SYSNAME         NOT NULL DEFAULT ORIGINAL_LOGIN(),
+    ExecutionDate           DATETIME2(0)    NOT NULL DEFAULT SYSDATETIME(),
+    IsDryRun                BIT             NOT NULL
+);
+GO
+=========================================================================================================
+3. Verification Stored Procedure
+=========================================================================================================
+This proc only reports ownership status.
+
+Useful for:
+monitoring
+dashboards
+SQL Agent reports
+compliance scans
+=========================================================================================================
+USE DBAUtility;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.usp_VerifyDatabaseOwners
+(
+    @ExpectedOwner SYSNAME = 'sa'
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        @@SERVERNAME AS ServerName,
+        d.name AS DatabaseName,
+        SUSER_SNAME(d.owner_sid) AS CurrentOwner,
+        CASE
+            WHEN SUSER_SNAME(d.owner_sid) = @ExpectedOwner
+                THEN 'COMPLIANT'
+            ELSE 'NON-COMPLIANT'
+        END AS ComplianceStatus,
+        d.state_desc,
+        d.recovery_model_desc,
+        d.create_date
+    FROM sys.databases d
+    WHERE d.database_id > 4
+    ORDER BY d.name;
+END
+GO
+=========================================================================================================
+4. Ownership Enforcement Stored Procedure
+=========================================================================================================
+This is the main automation procedure.
+
+Features:
+changes ownership to sa
+logs everything
+supports dry-run mode
+skips system DBs
+handles errors safely
+USE DBAUtility;
+GO
+=========================================================================================================
+CREATE OR ALTER PROCEDURE dbo.usp_EnforceDatabaseOwner
+(
+      @TargetOwner SYSNAME = 'sa'
+    , @DryRun BIT = 1
+)
+AS
+BEGIN
+
+    SET NOCOUNT ON;
+
+    DECLARE
+          @DatabaseName SYSNAME
+        , @CurrentOwner SYSNAME
+        , @SQL NVARCHAR(MAX);
+
+    DECLARE db_cursor CURSOR FAST_FORWARD FOR
+
+    SELECT
+          d.name
+        , SUSER_SNAME(d.owner_sid)
+    FROM sys.databases d
+    WHERE d.database_id > 4
+      AND d.state_desc = 'ONLINE'
+      AND ISNULL(SUSER_SNAME(d.owner_sid), '') <> @TargetOwner;
+
+    OPEN db_cursor;
+
+    FETCH NEXT FROM db_cursor
+    INTO @DatabaseName, @CurrentOwner;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+
+        BEGIN TRY
+
+            SET @SQL =
+            N'ALTER AUTHORIZATION ON DATABASE::['
+            + @DatabaseName +
+            N'] TO [' + @TargetOwner + N'];';
+
+            IF @DryRun = 1
+            BEGIN
+
+                INSERT INTO dbo.DatabaseOwnerAudit
+                (
+                      DatabaseName
+                    , PreviousOwner
+                    , NewOwner
+                    , ActionTaken
+                    , ExecutionStatus
+                    , ExecutionMessage
+                    , IsDryRun
+                )
+                VALUES
+                (
+                      @DatabaseName
+                    , @CurrentOwner
+                    , @TargetOwner
+                    , 'DRY RUN'
+                    , 'SUCCESS'
+                    , @SQL
+                    , 1
+                );
+
+            END
+            ELSE
+            BEGIN
+
+                EXEC sp_executesql @SQL;
+
+                INSERT INTO dbo.DatabaseOwnerAudit
+                (
+                      DatabaseName
+                    , PreviousOwner
+                    , NewOwner
+                    , ActionTaken
+                    , ExecutionStatus
+                    , ExecutionMessage
+                    , IsDryRun
+                )
+                VALUES
+                (
+                      @DatabaseName
+                    , @CurrentOwner
+                    , @TargetOwner
+                    , 'OWNER CHANGED'
+                    , 'SUCCESS'
+                    , @SQL
+                    , 0
+                );
+
+            END
+
+        END TRY
+
+        BEGIN CATCH
+
+            INSERT INTO dbo.DatabaseOwnerAudit
+            (
+                  DatabaseName
+                , PreviousOwner
+                , NewOwner
+                , ActionTaken
+                , ExecutionStatus
+                , ExecutionMessage
+                , IsDryRun
+            )
+            VALUES
+            (
+                  @DatabaseName
+                , @CurrentOwner
+                , @TargetOwner
+                , 'ERROR'
+                , 'FAILED'
+                , ERROR_MESSAGE()
+                , @DryRun
+            );
+
+        END CATCH;
+
+        FETCH NEXT FROM db_cursor
+        INTO @DatabaseName, @CurrentOwner;
+
+    END
+
+    CLOSE db_cursor;
+    DEALLOCATE db_cursor;
+
+END
+GO
+=========================================================================================================
+5. Example Usage
+=========================================================================================================
+Verification Only
+EXEC dbo.usp_VerifyDatabaseOwners;
+
+=========================================================================================================
+6. Dry Run (Recommended First)
+=========================================================================================================
+This logs what WOULD happen.
+
+No changes made.
+
+EXEC dbo.usp_EnforceDatabaseOwner
+      @TargetOwner = 'sa'
+    , @DryRun = 1;
+
+=========================================================================================================
+7. Actual Enforcement
+=========================================================================================================
+EXEC dbo.usp_EnforceDatabaseOwner
+      @TargetOwner = 'sa'
+    , @DryRun = 0;
+
+=========================================================================================================
+8. Review Audit History
+=========================================================================================================
+SELECT *
+FROM dbo.DatabaseOwnerAudit
+ORDER BY AuditID DESC;
+
+Production Hardening Recommendations
+=========================================================================================================
+A. Run from SQL Agent
+=========================================================================================================
+Schedule daily:
+
+verification job
+enforcement job
+alert job
+
+Using SQL Server Agent.
+
+Typical cadence:
+
+Job	Frequency
+Verify	hourly/daily
+Enforce	daily
+Alerting	immediate/daily
+=========================================================================================================
+B. Centralize Across Instances
+=========================================================================================================
+Do not manually connect to 40 servers.
+
+Use:
+
+CMS (Central Management Server)
+PowerShell
+dbatools
+orchestration platform
+
+This proc becomes your per-instance enforcement primitive.
+=========================================================================================================
+C. Exclude Certain Databases
+=========================================================================================================
+Some vendor systems may require specific ownership.
+
+Add exclusion table support:
+
+CREATE TABLE dbo.DatabaseOwnerExclusion
+(
+    DatabaseName SYSNAME PRIMARY KEY
+);
+
+Then exclude in cursor query.
+=========================================================================================================
+D. Capture Owner SID Problems Explicitly
+=========================================================================================================
+You can improve detection with:
+
+SUSER_SNAME(owner_sid) IS NULL
+
+That indicates:
+
+orphaned owner SID
+deleted AD account
+invalid login mapping
+
+Those should be high-priority remediation items.
+=========================================================================================================
+E. Security Permissions
+=========================================================================================================
+The proc requires:
+sysadmin
+because changing DB ownership is privileged.
+
+Do not try to over-engineer granular delegation here.
+Operational Recommendation
+=========================================================================================================
+The important operational pattern is:
+
+DB created/restored
+automated ownership normalization runs
+drift audit retained permanently
+alert if non-compliant
+
+That eliminates the “former employee owns 300 databases” problem permanently.

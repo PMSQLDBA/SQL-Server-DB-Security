@@ -1,0 +1,119 @@
+Change db ownership to SA Account:
+=================================
+For Microsoft SQL Server production environments, keep this simple:
+
+Recommended Standard
+All user databases should be owned by sa
+Never use personal AD accounts as DB owners
+Run a scheduled procedure to:
+check DB owners
+change non-compliant DBs to sa
+log changes into an audit table
+==========================================================================
+1. Audit Table
+==========================================================================
+USE DBAUtility;
+GO
+CREATE TABLE dbo.DatabaseOwnerAudit
+(
+    ID              INT IDENTITY(1,1),
+    DatabaseName    SYSNAME,
+    OldOwner        SYSNAME,
+    NewOwner        SYSNAME,
+    ChangedDate     DATETIME DEFAULT GETDATE(),
+    ChangedBy       SYSNAME DEFAULT ORIGINAL_LOGIN()
+);
+GO
+==========================================================================
+2. Simple Stored Procedure
+==========================================================================
+This procedure:
+
+checks all user databases
+changes owner to sa
+writes audit record
+==========================================================================
+USE DBAUtility;
+GO
+CREATE OR ALTER PROCEDURE dbo.usp_FixDatabaseOwners
+AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE
+          @DBName SYSNAME
+        , @Owner SYSNAME
+        , @SQL NVARCHAR(MAX);
+
+    DECLARE db_cursor CURSOR FOR
+
+    SELECT
+          name
+        , SUSER_SNAME(owner_sid)
+    FROM sys.databases
+    WHERE database_id > 4
+      AND SUSER_SNAME(owner_sid) <> 'sa';
+
+    OPEN db_cursor;
+
+    FETCH NEXT FROM db_cursor INTO @DBName, @Owner;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+
+        BEGIN TRY
+
+            SET @SQL =
+            'ALTER AUTHORIZATION ON DATABASE::['
+            + @DBName +
+            '] TO [sa]';
+
+            EXEC(@SQL);
+
+            INSERT INTO dbo.DatabaseOwnerAudit
+            (
+                  DatabaseName
+                , OldOwner
+                , NewOwner
+            )
+            VALUES
+            (
+                  @DBName
+                , @Owner
+                , 'sa'
+            );
+
+        END TRY
+        BEGIN CATCH
+
+            PRINT 'Failed for database: ' + @DBName;
+            PRINT ERROR_MESSAGE();
+
+        END CATCH
+
+        FETCH NEXT FROM db_cursor INTO @DBName, @Owner;
+
+    END
+
+    CLOSE db_cursor;
+    DEALLOCATE db_cursor;
+END
+GO
+==========================================================================
+3. Execute Procedure
+EXEC dbo.usp_FixDatabaseOwners;
+==========================================================================
+4. Verify Current Owners
+SELECT
+    name AS DatabaseName,
+    SUSER_SNAME(owner_sid) AS OwnerName
+FROM sys.databases
+WHERE database_id > 4
+ORDER BY name;
+==========================================================================
+5. Production Best Practice
+Create a daily SQL Server Agent job:
+
+Step 1:
+EXEC DBAUtility.dbo.usp_FixDatabaseOwners;
+
+That keeps ownership standardized automatically across the instance.

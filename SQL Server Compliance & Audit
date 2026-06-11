@@ -1,0 +1,102 @@
+# SQL Server Compliance & Audit – 100 Scenarios (Short Answers)
+
+1. **DBA has unapproved sysadmin** – Validate need, check approvals, revoke if unjustified, document, add to next access review.
+2. **Who has prod DB access (SOX)** – Pull server/DB role report, compare to approved access matrix, flag privileged accounts, submit with approval evidence.
+3. **Orphaned privileged accounts** – Identify via DMVs/last-login, confirm with owner, disable/remove, document remediation.
+4. **Terminated employee still has access** – Disable login immediately, investigate IAM offboarding gap, review permissions, document incident, fix process.
+5. **Quarterly access certification** – Export privileged user list, send to managers for sign-off, remove unconfirmed access, archive evidence.
+6. **Evidence of least privilege** – RBAC role matrix, SoD documentation, access review reports, remediation logs.
+7. **Audit sysadmin members** – Query sys.server_role_members, validate each member's need, remove excess, document.
+8. **Dev requests prod access** – Require justification + approval, grant time-bound via PAM, monitor activity, revoke after task.
+9. **DB activity monitoring controls** – SQL Server Audit/Extended Events enabled, login monitoring, sensitive-data tracking, SIEM integration.
+10. **Demonstrate SoD** – Devs have no prod DDL rights; DBAs don't approve own changes; security team performs independent reviews.
+11. **Undocumented permissions found** – Inventory via DMVs, identify owner/need, revoke unjustified, update documentation/RBAC.
+12. **Monitor privileged activity** – SQL Server Audit, Extended Events, failed-login alerts, change tracking, SIEM.
+13. **Evidence of failed login monitoring** – SQL Audit reports, SIEM alerts, incident tickets, monthly review summaries.
+14. **Unexpected sensitive data access** – Pull audit logs, confirm authorization, escalate to security if unauthorized, impact assessment, remediate.
+15. **How are backups secured** – Encrypted (TDE/backup encryption), restricted storage, retention policy enforced, access logged.
+16. **Validate DR compliance** – Periodic failover/restore tests, document RTO/RPO results, get sign-off, store evidence.
+17. **Proof of DB encryption** – Show TDE enabled, certificate/key management process, compliance attestation reports.
+18. **Inactive privileged accounts** – Disable immediately, confirm with owner, remove if unneeded, document.
+19. **Emergency production access** – Documented firefighter process: temp account, full session logging, auto-expiry, post-action review.
+20. **Support SOX audits** – Access reports, change records w/ approvals, audit logs, control documentation.
+21. **Who modified schema** – Pull DDL audit/Extended Events logs, match to change ticket and approval, present as evidence.
+22. **Audit service accounts** – Inventory accounts, confirm owner/purpose, review permissions, rotate credentials, validate usage.
+23. **Privileged access review approach** – Quarterly review, validate need with managers, remove excess, retain signed evidence.
+24. **Reduce audit findings** – Standardize provisioning, automate reviews, enforce least privilege, remediate promptly with closure docs.
+25. **Change management evidence** – Change ticket, CAB/manager approval, deployment evidence, validation results, closure record.
+26. **Unauthorized DB created** – Identify creator via logs, check for approved change, drop/quarantine if unauthorized, document.
+27. **Privileged user history** – Pull login/session history from SQL Audit/Extended Events plus prior access review records.
+28. **Excessive db_owner found** – Review against need, downgrade to specific roles (db_datawriter, etc.), update RBAC.
+29. **How RBAC works** – Roles map to job functions (least privilege), permissions granted via roles, reviewed periodically.
+30. **GDPR controls** – Encryption at rest/in transit, RBAC, audit logging of data access, dynamic data masking for PII.
+31. **PAM integration evidence** – Privileged accounts in PAM vault, auto-rotated/checked-out passwords, recorded/monitored sessions.
+32. **DBA changed prod object directly** – Check for approved emergency change; if none, log as unauthorized, review impact, reinforce CAB process.
+33. **Missing audit logs** – Investigate cause (audit disabled/retention gap), restore from backup if possible, re-enable auditing with retention and alerting.
+34. **Shared DBA account found** – Disable immediately, create individual named logins, enforce no-shared-credentials policy.
+35. **Unauthorized SQL Agent job** – Disable job, identify owner/creator via logs, review what it executed, remove if unauthorized, document.
+36. **Access request workflow** – Ticket → manager/CAB approval → DBA provisions → verification → periodic review.
+37. **High-risk permissions report** – Run report on sysadmin/db_owner/securityadmin etc., flag for justification review.
+38. **Evidence retention** – Maintain per defined policy (e.g., 1–3 yrs for SOX), stored in secure access-controlled repository.
+39. **Failed DR test** – Document root cause, fix issue, schedule retest, record results.
+40. **Privileged account inventory** – Generate report of all sysadmin/db_owner/security roles across instances, validate ownership/justification.
+41. **Schema modification evidence** – DDL audit logs showing object/schema changes correlated with change ticket and approver.
+42. **Weak password policy** – Identify accounts not enforcing CHECK_POLICY/CHECK_EXPIRATION, align with AD password policy, remediate.
+43. **Unauthorized linked server** – Identify creator/time via audit log, verify business need/security review, remove if unauthorized, document.
+44. **Backup validation evidence** – Backup job history, checksum/verification results, periodic restore (DR) test reports.
+45. **Data protection controls** – Encryption (TDE/TLS), access controls, masking, audit logging, retention/disposal policy.
+46. **How sensitive data is monitored** – SQL Audit/Extended Events log SELECT/DML on PII tables, reviewed via SIEM/periodic reports.
+47. **DBA bypassed change process** – Identify via audit logs, document deviation, get retroactive approval if valid, reinforce process.
+48. **Evidence for access removals** – Compare access removal tickets against current permission state to confirm removal applied.
+49. **Protecting prod data in non-prod** – Masked/synthetic data, separate environments, restricted refresh process, data masking tools.
+50. **Monthly security review reports** – Cover failed logins, privilege changes, new accounts, audit log health, open findings.
+51. **Sysadmin approval process** – Requires documented business justification plus manager and security/CAB approval before provisioning.
+52. **Elevated access requested w/o approval** – Reject request, return for proper manager approval, provision only once documented.
+53. **Stale service accounts** – Identify via DMVs/audit logs (no recent activity), confirm with owners, disable/remove if stale.
+54. **Sensitive table accessed after hours** – Pull audit logs for the event, verify if authorized (e.g., batch job), escalate if anomalous.
+55. **Privileged activity report** – Generate from SQL Audit/Extended Events showing privileged logins, commands, timestamps.
+56. **Access certification evidence** – Signed certification records showing managers reviewed/approved each privileged user's access.
+57. **DBA leaves organization** – Disable all logins/AD accounts, transfer ownership of jobs/objects, revoke all permissions, document offboarding.
+58. **SQL login created outside process** – Investigate creation event in audit logs, identify creator/reason, validate against change process, remove if unauthorized.
+59. **Who can restore databases** – Query sysadmin/db_backupoperator/db_owner members, cross-check with PAM/access matrix.
+60. **Encryption key management** – Keys (DEK/CEK) managed via certificates or external key vault (Azure Key Vault/HSM), restricted access, regular rotation/backup.
+61. **How incidents are tracked** – Logged in ticketing system (e.g., ServiceNow), categorized by severity, tracked to resolution, post-incident review.
+62. **Excessive permissions during review** – Compare against access matrix/job role, revoke beyond least privilege, document and re-certify.
+63. **Database ownership review** – Generate owner report, verify ownership is appropriate (not individual accounts) and aligns with policy.
+64. **Privileged user can't be justified** – Revoke access immediately, document as remediation item.
+65. **Unauthorized DDL activity** – Review DDL audit trail for who/what, check for approved change ticket, remediate if missing.
+66. **SOX controls** – Access reviews, segregation of duties, change management approvals, audit logging, evidence retention.
+67. **Database moved to new server** – Update documentation/CMDB, re-validate access/configs, retest backups/jobs, update monitoring/audit configs.
+68. **DR evidence** – DR test schedule, execution results, RTO/RPO measurements, management sign-off.
+69. **Failed login trends** – Pull counts/trends from SQL Audit or SIEM dashboards, highlight spikes/repeated source accounts.
+70. **How backups are tested** – Periodic restore drills to non-prod environment, results documented and signed off.
+71. **Account not linked to AD** – Identify the local SQL login, investigate why it bypassed provisioning, convert to AD-based or remove per policy.
+72. **Privileged access review overdue** – Run review immediately (prioritize high-risk accounts), document delay reason and corrective action.
+73. **Unauthorized schema changes** – Pull DDL audit logs, match against change tickets, flag/investigate any without approval.
+74. **Remediation evidence** – Before/after permission reports, removal tickets, confirmation access was revoked.
+75. **How audit logs are protected** – Stored in write-restricted location (separate server/SIEM), access limited to security team, integrity monitored (no DBA delete rights).
+76. **How did you remediate a finding** – Found root cause, removed unnecessary access, updated process, retested control, closed with evidence.
+77. **Evidence of least privilege** – RBAC role matrix, access review/certification results, permission reports showing minimal access.
+78. **Preparing for SOX audit** – Reviewed controls, validated current evidence, ran pre-audit self-assessment, remediated gaps beforehand.
+79. **Repeat audit findings** – Performed root cause analysis, redesigned control/process, implemented continuous monitoring.
+80. **Managing privileged service accounts** – Onboarded to PAM, enforced password rotation, reviewed permissions vs. actual usage.
+81. **Controls reducing insider threat** – Least privilege, segregation of duties, activity monitoring/auditing, PAM.
+82. **Validating access removals** – Cross-check removal tickets against live permissions, retain as evidence.
+83. **How prod access is controlled** – Approval workflows, PAM-managed credentials, session monitoring, periodic recertification.
+84. **Ensuring audit readiness** – Continuously updated documentation, centralized evidence repository, regular internal reviews.
+85. **Database risk assessment** – Identify risks (excessive access, unencrypted data), assess controls, recommend mitigations with owners/timelines.
+86. **Handling compliance exceptions** – Document with justification, get formal approval, track with expiration/review date.
+87. **Protecting privileged credentials** – PAM vaulting, MFA, regular automated password rotation.
+88. **Validating RBAC effectiveness** – Periodic access reviews, SoD checks, audit testing of role assignments.
+89. **Supporting regulatory audits** – Provide requested evidence, demonstrate control operation, explain remediation of gaps.
+90. **Activity logging** – SQL Server Audit + Extended Events, logs forwarded to SIEM for monitoring/alerting.
+91. **Audit logs altered** – Treat as security incident: investigate immediately, escalate to IR/security, restore/preserve evidence, review log integrity controls.
+92. **Monitoring direct permission assignments** – Periodic permission reports and quarterly access certifications by managers.
+93. **Validating DR controls** – Scheduled failover/restore tests with documented results and management sign-off.
+94. **Securing sensitive data** – Encryption (TDE/column encryption), strict RBAC, audit logging of access.
+95. **Demonstrating compliance maturity** – Declining audit findings, automated controls/monitoring, consistent evidence availability.
+96. **Responding to audit inquiries** – Understand exact request, gather/validate evidence, deliver accurately and on time.
+97. **Role during external audits** – Technical SME, evidence provider, owner of remediation tracking.
+98. **Managing audit evidence** – Centralized access-controlled repository, version control, defined retention schedule.
+99. **Ensuring control effectiveness** – Regular testing, periodic reviews, tracked metrics, continuous improvement.
+100. **Biggest compliance risk in SQL Server** – Excessive/unreviewed privileged access, weak change management, insufficient monitoring/auditing, poor documentation/evidence retention.

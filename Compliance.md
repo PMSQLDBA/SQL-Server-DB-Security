@@ -1,5 +1,7 @@
 # Security, Audit & Compliance Tools for Database Governance (SQL Server Focus)
 
+GitHub-ready Markdown table that you can directly paste into a README.md, Wiki page, or interview preparation repository.
+
 ## PAM (Privileged Access Management)
 
 | Tool | Primary Purpose | Key Features | Audit/Compliance Benefits |

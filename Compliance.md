@@ -1,6 +1,3 @@
-====================================================================================================================================================
-Below is a **GitHub-ready Markdown table** that you can directly paste into a `README.md`, Wiki page, or interview preparation repository.
-====================================================================================================================================================
 # Security, Audit & Compliance Tools for Database Governance (SQL Server Focus)
 
 ## PAM (Privileged Access Management)
